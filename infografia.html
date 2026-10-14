@@ -1,0 +1,714 @@
+<title>De la voz al texto</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Concepto: la señal viaja de arriba hacia abajo. Cada eje del taller es una etapa de la cadena voz → sensor → software → resultado → balance → usos. */
+:root{
+  --paper:#F2F5F5; --panel:#FFFFFF; --ink:#10252C; --muted:#52666E; --line:#D3DDDF;
+  --wave:#0A7D76; --wave-soft:#D8EEEC; --on-wave:#FFFFFF;
+  --hot:#C93D26; --hot-soft:#FBE3DD;
+  --code-bg:#0F2229; --code-fg:#D9ECEE;
+  --display:'Bricolage Grotesque',system-ui,sans-serif;
+  --body:'IBM Plex Sans',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0B1519; --panel:#122027; --ink:#E4EEF0; --muted:#93A8AF; --line:#25383F;
+    --wave:#4CCFC3; --wave-soft:#123A38; --on-wave:#04201E;
+    --hot:#FF7F68; --hot-soft:#3D221C;
+    --code-bg:#07100F; --code-fg:#D9ECEE; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0B1519; --panel:#122027; --ink:#E4EEF0; --muted:#93A8AF; --line:#25383F;
+  --wave:#4CCFC3; --wave-soft:#123A38; --on-wave:#04201E;
+  --hot:#FF7F68; --hot-soft:#3D221C;
+  --code-bg:#07100F; --code-fg:#D9ECEE; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--paper); color:var(--ink); font-family:var(--body); font-size:16px; line-height:1.6;
+  padding-block:0 64px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+}
+@media (prefers-reduced-motion: no-preference){ html{scroll-behavior:smooth} }
+.wrap{max-width:1080px;margin:0 auto}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;line-height:1.08;margin:0}
+p{margin:0}
+a{color:var(--wave)}
+:focus-visible{outline:3px solid var(--hot);outline-offset:2px}
+.mono{font-family:var(--mono)}
+.label{font-family:var(--mono);font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+
+/* navegación */
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line);
+  margin-left:calc(-1*max(16px, env(safe-area-inset-left, 0px)));margin-right:calc(-1*max(16px, env(safe-area-inset-right, 0px)));
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.nav ul{list-style:none;margin:0 auto;padding:10px 0;display:flex;gap:8px;overflow-x:auto;max-width:1080px}
+.nav a{display:block;white-space:nowrap;text-decoration:none;color:var(--ink);font-size:14px;font-weight:500;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+.nav a:hover{border-color:var(--wave);color:var(--wave)}
+
+/* portada */
+.hero{padding-block:48px 40px;display:grid;gap:28px}
+.hero h1{font-size:clamp(44px,9vw,92px);font-weight:800;letter-spacing:-.02em}
+.hero h1 span{color:var(--wave)}
+.hero .lead{font-size:clamp(17px,2.2vw,21px);max-width:62ch;color:var(--muted)}
+.ident{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 24px;border-top:1px solid var(--line);padding-top:18px}
+.ident div{min-width:0}
+.ident b{display:block;font-weight:600;overflow-wrap:anywhere}
+.chain{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:18px}
+.chain li{border-top:4px solid var(--wave);padding-top:10px;min-width:0}
+.chain li:nth-child(even){border-top-color:var(--hot)}
+.chain strong{display:block;font-family:var(--display);font-size:18px;line-height:1.15}
+.chain span{font-size:14px;color:var(--muted)}
+
+/* etapas */
+.stage{display:grid;gap:20px;padding-block:56px;border-top:1px solid var(--line)}
+@media (min-width:820px){
+  .stage{grid-template-columns:96px minmax(0,1fr);gap:32px}
+}
+.badge{display:flex;flex-direction:row;gap:10px;align-items:baseline}
+@media (min-width:820px){ .badge{flex-direction:column;align-items:flex-start;gap:2px} }
+.badge .n{font-family:var(--display);font-weight:800;font-size:56px;line-height:1;color:var(--wave)}
+.stage h2{font-size:clamp(30px,4.6vw,48px);font-weight:700;letter-spacing:-.01em}
+.body{display:grid;gap:24px;min-width:0}
+.body > p, .txt{max-width:70ch}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px}
+.cols > *{min-width:0}
+.prop{border-top:2px solid var(--ink);padding-top:10px}
+.prop h3{font-size:22px;margin-bottom:4px}
+.prop .mono{color:var(--wave);font-size:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:14px;min-width:0}
+.panel h3{font-size:20px}
+canvas{display:block;width:100%;height:200px;max-width:100%}
+.ctl{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+.ctl label{font-size:14px;font-weight:500}
+.ctl output{font-family:var(--mono);font-size:14px;min-width:7ch;text-align:right}
+input[type=range]{width:100%;accent-color:var(--wave)}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+.read div{border-left:3px solid var(--wave);padding-left:10px}
+.read b{display:block;font-family:var(--mono);font-size:18px;font-weight:500}
+.note{font-size:14px;color:var(--muted)}
+.note.alert{color:var(--hot);font-weight:600}
+button{font:inherit;cursor:pointer}
+.btn{background:var(--wave);color:var(--on-wave);border:0;border-radius:8px;padding:9px 16px;font-weight:600}
+.btn:hover{filter:brightness(1.08)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:6px 12px;border-radius:8px;font-size:14px}
+.seg button[aria-pressed="true"],.seg button[aria-selected="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+
+/* cadena del sensor */
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.steps li{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0;display:grid;gap:6px;align-content:start}
+.steps svg{width:100%;height:56px}
+.steps b{font-family:var(--display);font-size:16px;line-height:1.15}
+.steps span{font-size:13px;color:var(--muted)}
+
+/* software */
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tabs button{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 12px;border-radius:8px;font-size:14px;font-weight:500}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.detail{display:grid;gap:10px}
+.io{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.io div{background:var(--wave-soft);border-radius:8px;padding:10px 12px;font-size:14px;min-width:0}
+.formula{font-family:var(--mono);font-size:14px;background:var(--code-bg);color:var(--code-fg);padding:10px 12px;border-radius:8px;overflow-x:auto;white-space:pre}
+pre.code{margin:0;background:var(--code-bg);color:var(--code-fg);padding:14px 16px;border-radius:10px;overflow-x:auto;font-family:var(--mono);font-size:13.5px;line-height:1.55}
+
+/* resultado */
+.chat{display:grid;gap:10px;max-width:520px}
+.bub{padding:10px 14px;border-radius:14px;max-width:88%;font-size:15px}
+.bub.u{background:var(--wave-soft);justify-self:start;border-bottom-left-radius:4px}
+.bub.a{background:var(--panel);border:1px solid var(--line);justify-self:end;border-bottom-right-radius:4px}
+.bub small{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+.flow{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.flow li{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel);font-size:14px;min-width:0}
+.flow li b{display:block;font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--wave);margin-bottom:2px}
+.flow code{font-family:var(--mono);font-size:13px;overflow-wrap:anywhere}
+.field{display:grid;gap:4px}
+.field label{font-size:13px;font-weight:600}
+.field input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);min-width:0;width:100%}
+
+/* ventajas y desventajas */
+.pro-con ul{margin:0;padding-left:20px;display:grid;gap:8px}
+.pro-con li::marker{color:var(--wave)}
+.pro-con.con li::marker{color:var(--hot)}
+.pro-con li b{font-weight:600}
+
+/* usos */
+.uses{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.uses button{text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:12px;display:grid;gap:8px;min-width:0}
+.uses button svg{width:40px;height:40px}
+.uses button b{font-family:var(--display);font-size:17px;line-height:1.15}
+.uses button[aria-pressed="true"]{border-color:var(--wave);box-shadow:0 0 0 2px var(--wave)}
+.useDetail{background:var(--wave-soft);border-radius:10px;padding:16px 18px;display:grid;gap:6px}
+
+/* quiz y fuentes */
+.q{display:grid;gap:8px}
+.q .opts{display:flex;flex-wrap:wrap;gap:8px}
+.q .opts button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:8px 12px;font-size:14px}
+.q .opts button.ok{background:var(--wave);color:var(--on-wave);border-color:var(--wave)}
+.q .opts button.bad{background:var(--hot-soft);border-color:var(--hot)}
+.refs{display:grid;gap:12px;padding-left:0;list-style:none;margin:0}
+.refs li{padding-left:2em;text-indent:-2em;overflow-wrap:anywhere;font-size:15px}
+footer{border-top:1px solid var(--line);padding-top:20px;font-size:14px;color:var(--muted)}
+</style>
+
+<nav class="nav" aria-label="Secciones">
+  <ul>
+    <li><a href="#eje1">Onda</a></li>
+    <li><a href="#eje2">Sensor</a></li>
+    <li><a href="#eje3">Software</a></li>
+    <li><a href="#eje4">Resultado</a></li>
+    <li><a href="#eje5">Ventajas y límites</a></li>
+    <li><a href="#eje6">Aplicaciones</a></li>
+    <li><a href="#fuentes">Fuentes</a></li>
+  </ul>
+</nav>
+
+<div class="wrap">
+
+<header class="hero">
+  <p class="label">Línea A · Ondas sonoras y procesamiento de audio</p>
+  <h1>De la voz<br>al <span>texto</span></h1>
+  <p class="lead">Reconocimiento de voz y asistentes virtuales con IA. Cómo una onda de presión en el aire se convierte en números, en una imagen de frecuencias y finalmente en palabras que un programa puede entender.</p>
+  <ol class="chain" aria-label="Cadena de la señal">
+    <li><strong>Voz</strong><span>Onda mecánica de presión</span></li>
+    <li><strong>Micrófono</strong><span>Transductor: presión a voltaje</span></li>
+    <li><strong>Conversor A/D</strong><span>Muestreo a 16 kHz y cuantización</span></li>
+    <li><strong>Espectrograma</strong><span>Energía por frecuencia en el tiempo</span></li>
+    <li><strong>Modelo de IA</strong><span>Red neuronal tipo Transformer</span></li>
+    <li><strong>Texto y acción</strong><span>Transcripción, comando, respuesta</span></li>
+  </ol>
+  <div class="ident">
+    <div><span class="label">Aprendiz</span><b>Laura Salgado Castillo</b></div>
+    <div><span class="label">Ficha</span><b>3466001</b></div>
+    <div><span class="label">Instructora</span><b>Diana Marcela Torres Gutiérrez</b></div>
+    <div><span class="label">Programa</span><b>Tecnólogo en Análisis y Desarrollo de Software</b></div>
+  </div>
+</header>
+
+<!-- EJE 1 -->
+<section class="stage" id="eje1">
+  <div class="badge"><span class="n">1</span><span class="label">Eje · Física</span></div>
+  <div class="body">
+    <h2>El sonido es una onda mecánica</h2>
+    <p>Al hablar, las cuerdas vocales hacen vibrar el aire. Se forman zonas de compresión y de rarefacción que avanzan como una onda <b>mecánica longitudinal</b>. Necesita un medio material, por eso no se propaga en el vacío. En aire a 20 °C viaja a unos 343 m/s.</p>
+
+    <div class="panel">
+      <h3>Moléculas de aire al paso de una onda</h3>
+      <canvas id="cPart" style="height:150px" role="img" aria-label="Diagrama de partículas de aire con zonas de compresión y rarefacción"></canvas>
+      <p class="note">Donde las partículas se juntan hay mayor presión (compresión). Donde se separan hay menor presión (rarefacción). La distancia entre dos compresiones es la longitud de onda λ.</p>
+    </div>
+
+    <div class="cols">
+      <div class="prop"><h3>Frecuencia</h3><p class="mono">f en hercios (Hz)</p><p>Ciclos por segundo. Define el tono. La voz humana tiene una fundamental de unos 85 a 255 Hz, y la información que distingue una consonante de otra llega hasta cerca de 8 kHz.</p></div>
+      <div class="prop"><h3>Amplitud</h3><p class="mono">A en pascales o dB</p><p>Variación máxima de presión. Define el volumen. En el sistema se convierte en la altura de la señal eléctrica y decide cuánto se destaca la voz sobre el ruido.</p></div>
+      <div class="prop"><h3>Longitud de onda</h3><p class="mono">λ = v / f</p><p>Distancia entre dos compresiones. A 1 kHz, λ vale unos 34 cm. Cuanto más aguda la voz, más corta la onda.</p></div>
+    </div>
+
+    <div class="panel">
+      <h3>Pruébalo: cambia la onda</h3>
+      <canvas id="cWave" role="img" aria-label="Onda senoidal que cambia con la frecuencia y la amplitud elegidas"></canvas>
+      <div class="ctl"><label for="f">Frecuencia</label><input id="f" type="range" min="80" max="4000" step="10" value="440"><output id="fo" for="f">440 Hz</output></div>
+      <div class="ctl"><label for="a">Amplitud</label><input id="a" type="range" min="10" max="100" step="1" value="70"><output id="ao" for="a">70 %</output></div>
+      <div class="read">
+        <div><span class="label">Periodo T = 1/f</span><b id="rT"></b></div>
+        <div><span class="label">Longitud de onda λ</span><b id="rL"></b></div>
+        <div><span class="label">Velocidad v</span><b>343 m/s</b></div>
+      </div>
+      <p class="note" id="rN"></p>
+      <div class="row"><button class="btn" id="play" type="button">Escuchar este tono (1 s)</button><span class="note" id="playN">Se reproduce a volumen bajo.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- EJE 2 -->
+<section class="stage" id="eje2">
+  <div class="badge"><span class="n">2</span><span class="label">Eje · Sensor</span></div>
+  <div class="body">
+    <h2>El micrófono y el conversor analógico digital</h2>
+    <p>El <b>micrófono</b> es un transductor: convierte la presión del aire en voltaje. En celulares y bocinas inteligentes se usa el micrófono MEMS. Un diafragma diminuto se mueve con la onda, cambia la capacitancia y produce una señal eléctrica analógica. Después, el conversor A/D mide esa señal a intervalos regulares (<b>muestreo</b>) y redondea cada medida a un nivel entero (<b>cuantización</b>). El resultado es audio PCM, una lista de números.</p>
+
+    <ol class="steps" aria-label="Cadena del sensor">
+      <li>
+        <svg viewBox="0 0 120 56" role="img" aria-label="Onda de voz"><path d="M2 28 C14 4 26 52 38 28 S62 4 74 28 S98 52 118 28" fill="none" stroke="var(--wave)" stroke-width="3"/></svg>
+        <b>Voz</b><span>Onda de presión en el aire.</span>
+      </li>
+      <li>
+        <svg viewBox="0 0 120 56" role="img" aria-label="Diafragma del micrófono"><rect x="14" y="8" width="6" height="40" fill="var(--ink)"/><path d="M40 8 Q52 28 40 48" fill="none" stroke="var(--hot)" stroke-width="4"/><rect x="62" y="8" width="6" height="40" fill="var(--ink)"/><path d="M84 28 h30" stroke="var(--wave)" stroke-width="3"/><path d="M104 20 l10 8 -10 8" fill="none" stroke="var(--wave)" stroke-width="3"/></svg>
+        <b>Micrófono MEMS</b><span>El diafragma se mueve, cambia la capacitancia y aparece un voltaje.</span>
+      </li>
+      <li>
+        <svg viewBox="0 0 120 56" role="img" aria-label="Preamplificador y filtro"><path d="M14 8 L14 48 L58 28 Z" fill="none" stroke="var(--ink)" stroke-width="3"/><path d="M70 40 C82 40 84 14 96 14 H112" fill="none" stroke="var(--hot)" stroke-width="3"/></svg>
+        <b>Amplificador y filtro</b><span>Sube la señal y elimina lo que esté por encima de fs/2 (filtro antialiasing).</span>
+      </li>
+      <li>
+        <svg viewBox="0 0 120 56" role="img" aria-label="Muestreo"><path d="M2 28 C14 4 26 52 38 28 S62 4 74 28 S98 52 118 28" fill="none" stroke="var(--line)" stroke-width="2"/><g fill="var(--hot)"><circle cx="8" cy="16" r="3.5"/><circle cx="26" cy="44" r="3.5"/><circle cx="44" cy="22" r="3.5"/><circle cx="62" cy="10" r="3.5"/><circle cx="80" cy="38" r="3.5"/><circle cx="98" cy="46" r="3.5"/></g></svg>
+        <b>Conversor A/D</b><span>Toma muestras cada 1/fs segundos y las cuantiza con n bits.</span>
+      </li>
+      <li>
+        <svg viewBox="0 0 120 56" role="img" aria-label="Datos digitales"><g font-family="IBM Plex Mono, monospace" font-size="15" fill="var(--wave)"><text x="4" y="22">0110</text><text x="4" y="44">1011</text><text x="60" y="22">0011</text><text x="60" y="44">1101</text></g></svg>
+        <b>Audio PCM</b><span>Lista de enteros. A 16 kHz y 16 bits son 256 kbps por canal.</span>
+      </li>
+    </ol>
+
+    <p>El camino inverso también existe. Cuando el asistente responde, un DAC transforma los números en voltaje y un altavoz vuelve a producir una onda de presión.</p>
+
+    <div class="panel">
+      <h3>Pruébalo: muestreo, Nyquist y aliasing</h3>
+      <canvas id="cSamp" style="height:230px" role="img" aria-label="Señal analógica y sus muestras digitales durante 1 milisegundo"></canvas>
+      <div class="ctl"><label for="sf">Tono</label><input id="sf" type="range" min="500" max="12000" step="100" value="3000"><output id="sfo" for="sf">3.000 Hz</output></div>
+      <div>
+        <span class="label">Frecuencia de muestreo fs</span>
+        <div class="seg" id="fsSeg" role="group" aria-label="Frecuencia de muestreo">
+          <button type="button" data-v="4000" aria-pressed="false">4 kHz</button>
+          <button type="button" data-v="8000" aria-pressed="false">8 kHz (telefonía)</button>
+          <button type="button" data-v="16000" aria-pressed="true">16 kHz (voz)</button>
+          <button type="button" data-v="44100" aria-pressed="false">44,1 kHz (CD)</button>
+        </div>
+      </div>
+      <div>
+        <span class="label">Bits por muestra</span>
+        <div class="seg" id="bitSeg" role="group" aria-label="Bits por muestra">
+          <button type="button" data-v="3" aria-pressed="false">3 bits</button>
+          <button type="button" data-v="8" aria-pressed="false">8 bits</button>
+          <button type="button" data-v="16" aria-pressed="true">16 bits</button>
+        </div>
+      </div>
+      <div class="read">
+        <div><span class="label">Límite de Nyquist</span><b id="sNy"></b></div>
+        <div><span class="label">Tasa de datos</span><b id="sRate"></b></div>
+        <div><span class="label">Niveles</span><b id="sLev"></b></div>
+      </div>
+      <p class="note" id="sMsg"></p>
+      <p class="note">Línea de color: la señal analógica. Puntos y trazo naranja: lo que el software recibe tras muestrear y cuantizar. Regla de Nyquist-Shannon: fs ≥ 2 · fmax.</p>
+    </div>
+  </div>
+</section>
+
+<!-- EJE 3 -->
+<section class="stage" id="eje3">
+  <div class="badge"><span class="n">3</span><span class="label">Eje · Software</span></div>
+  <div class="body">
+    <h2>Qué hace el software con los números</h2>
+    <p>Una lista de muestras no dice qué palabra se pronunció. El software la transforma en una representación donde la voz se puede reconocer, y un modelo de IA la traduce a texto. Elige una etapa para ver su entrada, su salida y la matemática que usa.</p>
+
+    <div class="panel">
+      <div class="tabs" id="tabs" role="tablist" aria-label="Etapas del procesamiento"></div>
+      <div class="detail" id="detail" role="tabpanel" aria-live="polite"></div>
+    </div>
+
+    <div class="panel">
+      <h3>El espectrograma: la voz vista como imagen</h3>
+      <canvas id="cSpec" style="height:220px" role="img" aria-label="Ilustración de un espectrograma con bandas de energía llamadas formantes"></canvas>
+      <p class="note">Tiempo hacia la derecha, frecuencia hacia arriba (0 a 8 kHz), energía en color. Las bandas brillantes son los formantes que distinguen las vocales. Ilustración esquemática, no es una grabación real.</p>
+    </div>
+
+    <div class="cols">
+      <div>
+        <p class="label" style="margin-bottom:8px">Transcribir con Whisper (Python)</p>
+<pre class="code">import whisper
+
+modelo = whisper.load_model("base")
+resultado = modelo.transcribe("comando.wav", language="es")
+print(resultado["text"])</pre>
+      </div>
+      <div>
+        <p class="label" style="margin-bottom:8px">Lógica de un asistente (simplificada)</p>
+<pre class="code">texto = resultado["text"].lower()
+
+if "enciende" in texto and "luz" in texto:
+    encender_luz()
+    responder("Listo")</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EJE 4 -->
+<section class="stage" id="eje4">
+  <div class="badge"><span class="n">4</span><span class="label">Eje · Resultado</span></div>
+  <div class="body">
+    <h2>Lo que vive el usuario</h2>
+    <p>Para quien habla, todo ocurre en un instante. Dice una frase y obtiene una acción o un texto. Detrás hay dos resultados distintos: la transcripción y la comprensión de la intención.</p>
+
+    <div class="chat" aria-label="Ejemplo de conversación con un asistente">
+      <div class="bub u"><small>Usuario dice</small>Oye asistente, enciende la luz de la sala.</div>
+      <div class="bub a"><small>Asistente responde</small>Listo, encendí la luz de la sala.</div>
+    </div>
+
+    <ul class="flow" aria-label="Lo que ocurre entre la pregunta y la respuesta">
+      <li><b>1 · Transcripción</b><code>"enciende la luz de la sala"</code></li>
+      <li><b>2 · Intención</b><code>encender_luz</code></li>
+      <li><b>3 · Entidad</b><code>lugar = sala</code></li>
+      <li><b>4 · Acción</b>El bombillo inteligente recibe la orden.</li>
+      <li><b>5 · Respuesta</b>Síntesis de voz: un DAC y un altavoz generan la onda de respuesta.</li>
+    </ul>
+
+    <div class="panel">
+      <h3>Pruébalo: cómo se mide el error</h3>
+      <p class="note">La métrica estándar es la tasa de error por palabra (WER). Cuenta sustituciones (S), eliminaciones (D) e inserciones (I) frente a la frase correcta. Edita las frases.</p>
+      <div class="cols">
+        <div class="field"><label for="ref">Frase correcta</label><input id="ref" type="text" value="enciende la luz de la sala" autocomplete="off"></div>
+        <div class="field"><label for="hyp">Lo que entendió el sistema</label><input id="hyp" type="text" value="enciende la lupa de sala" autocomplete="off"></div>
+      </div>
+      <div class="read">
+        <div><span class="label">Sustituciones</span><b id="wS"></b></div>
+        <div><span class="label">Eliminaciones</span><b id="wD"></b></div>
+        <div><span class="label">Inserciones</span><b id="wI"></b></div>
+        <div><span class="label">WER</span><b id="wW"></b></div>
+      </div>
+      <p class="formula" id="wF"></p>
+    </div>
+  </div>
+</section>
+
+<!-- EJE 5 -->
+<section class="stage" id="eje5">
+  <div class="badge"><span class="n">5</span><span class="label">Eje · Balance</span></div>
+  <div class="body">
+    <h2>Ventajas y desventajas técnicas</h2>
+
+    <div class="panel">
+      <h3>El enemigo físico: el ruido</h3>
+      <canvas id="cNoise" role="img" aria-label="Onda de voz con ruido añadido"></canvas>
+      <div class="ctl"><label for="ns">Ruido ambiente</label><input id="ns" type="range" min="0" max="100" step="1" value="15"><output id="nso" for="ns">15 %</output></div>
+      <div class="read">
+        <div><span class="label">Relación señal/ruido</span><b id="snr"></b></div>
+      </div>
+      <p class="note" id="snrN"></p>
+    </div>
+
+    <div class="cols">
+      <div class="pro-con">
+        <h3 style="margin-bottom:10px">Ventajas</h3>
+        <ul>
+          <li><b>Manos libres.</b> Se usa conduciendo, cocinando o trabajando con las manos ocupadas.</li>
+          <li><b>Accesibilidad.</b> Permite controlar dispositivos y dictar a personas con limitaciones motrices o visuales.</li>
+          <li><b>Multilingüe y robusto.</b> Whisper se entrenó con 680.000 horas de audio multilingüe y multitarea y funciona sin ajuste fino. Según su artículo, se acerca a la precisión y robustez humanas.</li>
+          <li><b>Rapidez.</b> Hablar suele ser más rápido que teclear.</li>
+          <li><b>Escalable.</b> El mismo software atiende a millones de usuarios, en la nube o en el propio dispositivo.</li>
+        </ul>
+      </div>
+      <div class="pro-con con">
+        <h3 style="margin-bottom:10px">Desventajas</h3>
+        <ul>
+          <li><b>Ruido y eco.</b> Bajan la relación señal/ruido y suben los errores.</li>
+          <li><b>Acentos y vocabulario.</b> Dialectos, jerga y términos técnicos pueden transcribirse mal.</li>
+          <li><b>Privacidad.</b> La voz es un dato personal y los dispositivos están a la escucha de la palabra de activación.</li>
+          <li><b>Costo y latencia.</b> Los modelos grandes exigen mucho cómputo y, en la nube, buena conexión.</li>
+          <li><b>Errores creíbles.</b> Los modelos generativos pueden inventar texto cuando hay silencio o ruido intenso.</li>
+          <li><b>Límite físico.</b> Muestrear a 8 kHz (telefonía) solo conserva hasta 4 kHz y pierde detalle de consonantes.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EJE 6 -->
+<section class="stage" id="eje6">
+  <div class="badge"><span class="n">6</span><span class="label">Eje · Usos</span></div>
+  <div class="body">
+    <h2>Dónde se usa hoy</h2>
+    <p>Toca una tarjeta para ver cómo se aplica.</p>
+    <div class="uses" id="uses"></div>
+    <div class="useDetail" id="useDetail" aria-live="polite"></div>
+
+    <div class="panel">
+      <h3>Para explorar más</h3>
+      <p><a href="https://phet.colorado.edu/en/simulations/wave-interference" target="_blank" rel="noopener">Simulador PhET: interferencia de ondas</a>. Permite ver sonido, agua y luz.</p>
+      <p><a href="https://github.com/openai/whisper" target="_blank" rel="noopener">Whisper en GitHub</a>. Código y modelos abiertos para probar el reconocimiento de voz.</p>
+      <p><a href="https://arxiv.org/abs/2212.04356" target="_blank" rel="noopener">Artículo original de Whisper (arXiv)</a>.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Comprueba lo aprendido</h3>
+      <div id="quiz" style="display:grid;gap:16px"></div>
+    </div>
+  </div>
+</section>
+
+<!-- FUENTES -->
+<section class="stage" id="fuentes">
+  <div class="badge"><span class="n" style="font-size:40px">APA</span><span class="label">Referencias</span></div>
+  <div class="body">
+    <h2>Fuentes consultadas</h2>
+    <ol class="refs">
+      <li>Davis, S., &amp; Mermelstein, P. (1980). Comparison of parametric representations for monosyllabic word recognition in continuously spoken sentences. <i>IEEE Transactions on Acoustics, Speech, and Signal Processing, 28</i>(4), 357–366. <a href="https://doi.org/10.1109/TASSP.1980.1163420" target="_blank" rel="noopener">https://doi.org/10.1109/TASSP.1980.1163420</a></li>
+      <li>Jurafsky, D., &amp; Martin, J. H. (2025). <i>Speech and language processing</i> (3.ª ed., borrador). Stanford University. <a href="https://web.stanford.edu/~jurafsky/slp3/" target="_blank" rel="noopener">https://web.stanford.edu/~jurafsky/slp3/</a></li>
+      <li>OpenAI. (s. f.). <i>Whisper</i> [Repositorio de código]. GitHub. <a href="https://github.com/openai/whisper" target="_blank" rel="noopener">https://github.com/openai/whisper</a></li>
+      <li>Radford, A., Kim, J. W., Xu, T., Brockman, G., McLeavey, C., &amp; Sutskever, I. (2022). <i>Robust speech recognition via large-scale weak supervision</i>. arXiv. <a href="https://doi.org/10.48550/arXiv.2212.04356" target="_blank" rel="noopener">https://doi.org/10.48550/arXiv.2212.04356</a></li>
+      <li>Shannon, C. E. (1949). Communication in the presence of noise. <i>Proceedings of the IRE, 37</i>(1), 10–21. <a href="https://doi.org/10.1109/JRPROC.1949.232969" target="_blank" rel="noopener">https://doi.org/10.1109/JRPROC.1949.232969</a></li>
+      <li>University of Colorado Boulder. (s. f.). <i>Wave interference</i> [Simulación]. PhET Interactive Simulations. <a href="https://phet.colorado.edu/en/simulations/wave-interference" target="_blank" rel="noopener">https://phet.colorado.edu/en/simulations/wave-interference</a></li>
+      <li>Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., &amp; Polosukhin, I. (2017). Attention is all you need. <i>Advances in Neural Information Processing Systems, 30</i>. <a href="https://doi.org/10.48550/arXiv.1706.03762" target="_blank" rel="noopener">https://doi.org/10.48550/arXiv.1706.03762</a></li>
+    </ol>
+    <p class="note">Diagramas, simulaciones e ilustraciones: elaboración propia para este taller. Los valores de velocidad del sonido y los rangos de frecuencia de la voz son aproximados.</p>
+    <footer>Laura Salgado Castillo · Ficha 3466001 · Tecnólogo en Análisis y Desarrollo de Software · Instructora Diana Marcela Torres Gutiérrez · SENA, Guía de aprendizaje 2</footer>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function(){
+  var $=function(s){return document.querySelector(s)};
+  var css=function(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()};
+  var fmt=function(n,d){return n.toLocaleString('es-CO',{maximumFractionDigits:d==null?1:d})};
+  function setup(c){
+    var dpr=window.devicePixelRatio||1, w=c.clientWidth, h=c.clientHeight;
+    c.width=Math.max(1,Math.round(w*dpr)); c.height=Math.max(1,Math.round(h*dpr));
+    var x=c.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0); x.clearRect(0,0,w,h);
+    return {x:x,w:w,h:h};
+  }
+  function label(x,t,px,py,col,al){x.font='12px "IBM Plex Mono",monospace';x.fillStyle=col||css('--muted');x.textAlign=al||'left';x.fillText(t,px,py)}
+
+  /* ---------- Eje 1: partículas ---------- */
+  function drawPart(){
+    var c=$('#cPart'); var s=setup(c), x=s.x, w=s.w, h=s.h;
+    var lam=w/2.4, k=2*Math.PI/lam, A=lam*0.17, rows=6, per=64;
+    x.fillStyle=css('--wave');
+    for(var r=0;r<rows;r++){
+      var y=26+(h-52)*(r+0.5)/rows;
+      for(var i=0;i<per;i++){
+        var x0=(i+0.5)*w/per, px=x0+A*Math.sin(k*x0);
+        x.beginPath(); x.arc(px,y,2.6,0,6.2832); x.fill();
+      }
+    }
+    var comp=Math.PI/k, rare=0;
+    var col=css('--hot');
+    [rare,rare+lam,rare+2*lam].forEach(function(p){ if(p>8&&p<w-8) label(x,'rarefacción',p,12,col,'center')});
+    [comp,comp+lam].forEach(function(p){ if(p>8&&p<w-8) label(x,'compresión',p,12,col,'center')});
+    x.strokeStyle=col; x.lineWidth=1.5; x.beginPath(); x.moveTo(comp,h-12); x.lineTo(comp+lam,h-12);
+    x.moveTo(comp,h-17); x.lineTo(comp,h-7); x.moveTo(comp+lam,h-17); x.lineTo(comp+lam,h-7); x.stroke();
+    label(x,'λ',comp+lam/2,h-16,col,'center');
+  }
+
+  /* ---------- Eje 1: onda ---------- */
+  var ac=null;
+  function drawWave(){
+    var c=$('#cWave'); var s=setup(c), x=s.x, w=s.w, h=s.h;
+    var f=+$('#f').value, a=+$('#a').value/100;
+    var mid=h/2+8, amp=(h/2-34)*a, cyc=4, pw=w/cyc;
+    x.strokeStyle=css('--line'); x.lineWidth=1; x.beginPath(); x.moveTo(0,mid); x.lineTo(w,mid); x.stroke();
+    x.strokeStyle=css('--wave'); x.lineWidth=2.5; x.beginPath();
+    for(var i=0;i<=w;i++){var t=i/w*cyc,y=mid-amp*Math.sin(2*Math.PI*t); if(i){x.lineTo(i,y)}else{x.moveTo(i,y)}}
+    x.stroke();
+    var hot=css('--hot'); x.strokeStyle=hot; x.lineWidth=1.5; x.beginPath();
+    x.moveTo(0,16); x.lineTo(pw,16); x.moveTo(0,11); x.lineTo(0,21); x.moveTo(pw,11); x.lineTo(pw,21); x.stroke();
+    label(x,'T = '+fmt(1000/f,2)+' ms',pw/2,10,hot,'center');
+    var ax=pw*0.25; x.beginPath(); x.moveTo(ax,mid); x.lineTo(ax,mid-amp); x.stroke();
+    label(x,'A',ax+6,mid-amp/2+4,hot,'left');
+    label(x,'ventana mostrada: '+fmt(4000/f,2)+' ms',w-6,h-8,css('--muted'),'right');
+    $('#fo').textContent=fmt(f,0)+' Hz'; $('#ao').textContent=Math.round(a*100)+' %';
+    $('#rT').textContent=fmt(1000/f,2)+' ms';
+    var lam=343/f; $('#rL').textContent=lam<1?fmt(lam*100,1)+' cm':fmt(lam,2)+' m';
+    var n; if(f<85) n='Más grave que la voz humana.';
+    else if(f<=255) n='Dentro del rango de la frecuencia fundamental de la voz humana.';
+    else if(f<=4000) n='Rango de armónicos y formantes, donde se distinguen vocales y consonantes.';
+    $('#rN').textContent=n;
+  }
+  $('#f').addEventListener('input',drawWave); $('#a').addEventListener('input',drawWave);
+  $('#play').addEventListener('click',function(){
+    try{
+      var AC=window.AudioContext||window.webkitAudioContext; if(!AC) throw 0;
+      if(!ac) ac=new AC(); if(ac.state==='suspended') ac.resume();
+      var o=ac.createOscillator(), g=ac.createGain(), f=+$('#f').value, a=+$('#a').value/100, now=ac.currentTime;
+      o.type='sine'; o.frequency.value=f;
+      g.gain.setValueAtTime(0,now); g.gain.linearRampToValueAtTime(0.12*a,now+0.05); g.gain.setValueAtTime(0.12*a,now+0.9); g.gain.linearRampToValueAtTime(0,now+1);
+      o.connect(g); g.connect(ac.destination); o.start(now); o.stop(now+1.02);
+      $('#playN').textContent='Reproduciendo '+fmt(f,0)+' Hz.';
+      setTimeout(function(){$('#playN').textContent='Se reproduce a volumen bajo.'},1100);
+    }catch(e){ $('#playN').textContent='Tu navegador no permitió reproducir audio.'; }
+  });
+
+  /* ---------- Eje 2: muestreo ---------- */
+  var S={fs:16000,bits:16};
+  function seg(sel,key,fn){
+    var el=$(sel);
+    el.addEventListener('click',function(e){
+      var b=e.target.closest('button'); if(!b) return;
+      el.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});
+      S[key]=+b.dataset.v; fn();
+    });
+  }
+  function drawSamp(){
+    var c=$('#cSamp'); var s=setup(c), x=s.x, w=s.w, h=s.h;
+    var f=+$('#sf').value, fs=S.fs, bits=S.bits, L=Math.pow(2,bits), T=0.001, mid=h/2, A=h/2-20;
+    var sig=function(t){return 0.85*Math.sin(2*Math.PI*f*t+0.5)};
+    var q=function(v){return Math.max(-1,Math.min(1,Math.round((v+1)/2*(L-1))/(L-1)*2-1))};
+    if(L<=16){
+      x.strokeStyle=css('--line'); x.lineWidth=1;
+      for(var k=0;k<L;k++){var yy=mid-(k/(L-1)*2-1)*A; x.beginPath(); x.moveTo(0,yy); x.lineTo(w,yy); x.stroke();}
+    } else {
+      x.strokeStyle=css('--line'); x.lineWidth=1; x.beginPath(); x.moveTo(0,mid); x.lineTo(w,mid); x.stroke();
+    }
+    x.strokeStyle=css('--wave'); x.lineWidth=2; x.beginPath();
+    for(var i=0;i<=w;i++){var t=i/w*T,y=mid-sig(t)*A; if(i){x.lineTo(i,y)}else{x.moveTo(i,y)}}
+    x.stroke();
+    var hot=css('--hot'), N=Math.floor(T*fs), pts=[];
+    for(var n=0;n<=N;n++){var t2=n/fs; pts.push([t2/T*w, mid-q(sig(t2))*A]);}
+    x.strokeStyle=hot; x.lineWidth=1.5; x.beginPath();
+    pts.forEach(function(p,i){if(i){x.lineTo(p[0],p[1])}else{x.moveTo(p[0],p[1])}}); x.stroke();
+    x.fillStyle=hot; pts.forEach(function(p){x.beginPath(); x.arc(p[0],p[1],3.4,0,6.2832); x.fill()});
+    label(x,'0',4,h-6); label(x,'1 ms',w-4,h-6,css('--muted'),'right');
+    var ny=fs/2;
+    $('#sfo').textContent=fmt(f,0)+' Hz';
+    $('#sNy').textContent=fmt(ny,0)+' Hz';
+    $('#sRate').textContent=fmt(fs*bits/1000,1)+' kbps';
+    $('#sLev').textContent=fmt(L,0);
+    var m=$('#sMsg');
+    if(f<=ny){ m.className='note'; m.textContent='Sin aliasing. El tono ('+fmt(f,0)+' Hz) está por debajo del límite de Nyquist y se reconstruye bien.'; }
+    else { var fa=Math.abs(f-fs*Math.round(f/fs)); m.className='note alert'; m.textContent='Aliasing. El tono supera el límite de Nyquist, y el software "oye" un tono falso de '+fmt(fa,0)+' Hz. Por eso se filtra antes de muestrear.'; }
+  }
+  $('#sf').addEventListener('input',drawSamp);
+  seg('#fsSeg','fs',drawSamp); seg('#bitSeg','bits',drawSamp);
+
+  /* ---------- Eje 3: etapas ---------- */
+  var steps=[
+    {t:'1 · Captura PCM',i:'Voltaje analógico del micrófono.',o:'Lista de muestras a 16 kHz, normalizadas entre -1 y 1.',d:'El audio llega como PCM. Los modelos de voz suelen trabajar con 16 kHz porque captura hasta 8 kHz, donde está casi toda la información de los fonemas. Whisper procesa bloques de 30 segundos.',f:'x[n],  n = 0 … N-1,   fs = 16 000 muestras/s'},
+    {t:'2 · Ventaneo',i:'Lista continua de muestras.',o:'Tramos de 25 ms (400 muestras) cada 10 ms (160 muestras).',d:'En 25 ms el habla cambia poco, así que cada tramo se puede analizar como si fuera estable. Una ventana de Hann suaviza los bordes para que el corte no genere frecuencias falsas.',f:'xw[n] = x[n] · w[n]\nw[n] = 0,5 · (1 - cos(2πn / (N-1)))'},
+    {t:'3 · FFT',i:'Un tramo de 25 ms en el tiempo.',o:'Cuánta energía hay en cada frecuencia.',d:'La transformada rápida de Fourier descompone el tramo en ondas senoidales de distinta frecuencia. Pasamos del dominio del tiempo al de la frecuencia. Al apilar todos los tramos se obtiene un espectrograma.',f:'X[k] = Σ xw[n] · e^(-j·2π·k·n / N)'},
+    {t:'4 · Filtros mel y log',i:'Espectro lineal por tramo.',o:'Espectrograma log-Mel: matriz tiempo × bandas.',d:'Se agrupan las frecuencias en bandas que imitan al oído, con más detalle en graves, y se aplica logaritmo para comprimir el volumen. Whisper usa 80 bandas mel (128 en large-v3). Esta "imagen" es la entrada del modelo.',f:'mel = 2595 · log10(1 + f / 700)'},
+    {t:'5 · Red neuronal',i:'Espectrograma log-Mel.',o:'Probabilidades de los siguientes tokens de texto.',d:'Whisper usa un Transformer de codificador y decodificador (Vaswani et al., 2017). El codificador resume el audio y el decodificador predice el texto token por token, condicionado por el idioma y la tarea. Se entrenó con 680.000 horas de audio.',f:'P( token_t | token_1 … token_(t-1), audio )'},
+    {t:'6 · Decodificación',i:'Probabilidades por token.',o:'Texto con puntuación y marcas de tiempo.',d:'Se elige la secuencia más probable con una búsqueda guiada, se aplican reglas de formato y se une todo en la transcripción final.',f:'texto = argmax  P(tokens | audio)'},
+    {t:'7 · Comprensión',i:'Texto transcrito.',o:'Intención, entidades y acción a ejecutar.',d:'En un asistente virtual, un módulo de comprensión del lenguaje clasifica la intención ("encender_luz"), extrae datos ("sala") y dispara la acción. Después se responde con síntesis de voz.',f:'intención = clasificar("enciende la luz de la sala")'}
+  ];
+  var tabs=$('#tabs'), det=$('#detail');
+  steps.forEach(function(s,i){
+    var b=document.createElement('button'); b.type='button'; b.setAttribute('role','tab'); b.setAttribute('aria-selected',i===0?'true':'false'); b.textContent=s.t;
+    b.addEventListener('click',function(){tabs.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-selected',x===b?'true':'false')}); showStep(i)});
+    tabs.appendChild(b);
+  });
+  function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+  function showStep(i){
+    var s=steps[i];
+    det.innerHTML='<h3>'+esc(s.t.slice(4))+'</h3><div class="io"><div><span class="label">Entrada</span><br>'+esc(s.i)+'</div><div><span class="label">Salida</span><br>'+esc(s.o)+'</div></div><p>'+esc(s.d)+'</p><div class="formula">'+esc(s.f)+'</div>';
+  }
+  showStep(0);
+
+  /* espectrograma ilustrativo */
+  function cmap(v){
+    var st=[[0,0,4],[59,15,112],[140,41,129],[222,73,104],[254,159,109],[252,253,191]];
+    v=Math.max(0,Math.min(1,v))*(st.length-1); var i=Math.min(st.length-2,Math.floor(v)), f=v-i, a=st[i], b=st[i+1];
+    return 'rgb('+Math.round(a[0]+(b[0]-a[0])*f)+','+Math.round(a[1]+(b[1]-a[1])*f)+','+Math.round(a[2]+(b[2]-a[2])*f)+')';
+  }
+  function G(x,m,s){var d=(x-m)/s;return Math.exp(-d*d)}
+  function drawSpec(){
+    var c=$('#cSpec'); var s=setup(c), x=s.x, w=s.w, h=s.h, cw=3, ch=3, lm=34, W=w-lm;
+    for(var px=0;px<W;px+=cw){
+      var t=px/W, env=Math.pow(Math.max(0,Math.sin(2*Math.PI*3.2*t+0.4)),0.6);
+      var f1=0.07+0.04*Math.sin(2*Math.PI*1.7*t), f2=0.2+0.08*Math.sin(2*Math.PI*2.3*t+1), f3=0.33+0.02*Math.sin(2*Math.PI*1.1*t);
+      for(var py=0;py<h;py+=ch){
+        var fr=1-py/h;
+        var v=env*(0.95*G(fr,f1,0.03)+0.72*G(fr,f2,0.035)+0.45*G(fr,f3,0.04)+0.18*Math.exp(-fr*4))*(0.85+0.15*Math.sin(fr*260));
+        v+=0.04*Math.abs(Math.sin(px*12.9898+py*78.233)*43758.5453%1);
+        x.fillStyle=cmap(v); x.fillRect(lm+px,py,cw,ch);
+      }
+    }
+    label(x,'8 kHz',lm-4,12,null,'right'); label(x,'4 kHz',lm-4,h/2+4,null,'right'); label(x,'0',lm-4,h-4,null,'right');
+  }
+
+  /* ---------- Eje 4: WER ---------- */
+  function wer(ref,hyp){
+    var r=ref.trim().toLowerCase().split(/\s+/).filter(Boolean), h=hyp.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    var n=r.length, m=h.length, d=[], i, j;
+    for(i=0;i<=n;i++){d.push(new Array(m+1).fill(0)); d[i][0]=i}
+    for(j=0;j<=m;j++) d[0][j]=j;
+    for(i=1;i<=n;i++) for(j=1;j<=m;j++) d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(r[i-1]===h[j-1]?0:1));
+    var S=0,D=0,I=0; i=n; j=m;
+    while(i>0||j>0){
+      if(i>0&&j>0&&d[i][j]===d[i-1][j-1]+(r[i-1]===h[j-1]?0:1)){ if(r[i-1]!==h[j-1]) S++; i--; j--; }
+      else if(i>0&&d[i][j]===d[i-1][j]+1){ D++; i--; }
+      else { I++; j--; }
+    }
+    return {S:S,D:D,I:I,N:n};
+  }
+  function updWer(){
+    var r=wer($('#ref').value,$('#hyp').value);
+    $('#wS').textContent=r.S; $('#wD').textContent=r.D; $('#wI').textContent=r.I;
+    if(!r.N){ $('#wW').textContent='-'; $('#wF').textContent='Escribe la frase correcta para calcular el WER.'; return; }
+    var v=(r.S+r.D+r.I)/r.N;
+    $('#wW').textContent=fmt(v*100,1)+' %';
+    $('#wF').textContent='WER = (S + D + I) / N = ('+r.S+' + '+r.D+' + '+r.I+') / '+r.N+' = '+fmt(v*100,1)+' %';
+  }
+  $('#ref').addEventListener('input',updWer); $('#hyp').addEventListener('input',updWer); updWer();
+
+  /* ---------- Eje 5: ruido ---------- */
+  var noise=(function(){
+    var a=123456789, out=[], r=function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+    for(var i=0;i<4000;i++){out.push(Math.sqrt(-2*Math.log(r()+1e-9))*Math.cos(2*Math.PI*r()))}
+    return out;
+  })();
+  function drawNoise(){
+    var c=$('#cNoise'); var s=setup(c), x=s.x, w=s.w, h=s.h, mid=h/2, A=h/2-14, sg=+$('#ns').value/100*0.9;
+    x.strokeStyle=css('--line'); x.lineWidth=1; x.beginPath(); x.moveTo(0,mid); x.lineTo(w,mid); x.stroke();
+    x.strokeStyle=css('--wave'); x.lineWidth=1; x.globalAlpha=.35; x.beginPath();
+    for(var i=0;i<=w;i++){var y=mid-0.8*A*Math.sin(2*Math.PI*i/w*5); if(i){x.lineTo(i,y)}else{x.moveTo(i,y)}} x.stroke(); x.globalAlpha=1;
+    x.strokeStyle=css('--hot'); x.lineWidth=1.6; x.beginPath();
+    for(var j=0;j<=w;j++){var v=0.8*Math.sin(2*Math.PI*j/w*5)+sg*noise[j%noise.length]; v=Math.max(-1.05,Math.min(1.05,v)); var yy=mid-v*A; if(j){x.lineTo(j,yy)}else{x.moveTo(j,yy)}} x.stroke();
+    label(x,'Voz limpia (tenue) y voz con ruido (naranja)',6,12);
+    $('#nso').textContent=Math.round(sg/0.9*100)+' %';
+    var m=$('#snrN');
+    if(sg<0.005){ $('#snr').textContent='sin ruido'; m.textContent='La voz domina la señal y el modelo casi no tiene dudas.'; return; }
+    var snr=10*Math.log10(0.32/(sg*sg));
+    $('#snr').textContent=fmt(snr,1)+' dB';
+    m.textContent= snr>=20?'Señal clara. Las condiciones son buenas para reconocer voz.':(snr>=10?'Todavía se entiende, pero los errores empiezan a aumentar.':'El ruido compite con la voz. Aquí fallan hasta los mejores sistemas.');
+  }
+  $('#ns').addEventListener('input',drawNoise);
+
+  /* ---------- Eje 6: usos ---------- */
+  var uses=[
+    {n:'Asistentes virtuales',s:'Alexa, Siri, Google Assistant',d:'Una palabra de activación despierta al dispositivo. Después la voz se transcribe, se interpreta la intención y se ejecuta una acción: poner música, preguntar la hora o controlar la casa.',p:'M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM6 11a6 6 0 0 0 12 0M12 17v4'},
+    {n:'Subtítulos automáticos',s:'Video y transmisiones',d:'Plataformas de video y videollamadas transcriben el audio casi en tiempo real y lo muestran como texto sincronizado con marcas de tiempo.',p:'M3 6h18v12H3zM7 11h4M13 11h4M7 14h7'},
+    {n:'Dictado clínico',s:'Salud',d:'Profesionales de la salud dictan notas y historias clínicas, que el sistema convierte en texto para ahorrar tiempo de digitación.',p:'M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z'},
+    {n:'Transcripción de reuniones',s:'Trabajo y educación',d:'Grabaciones de reuniones, clases y entrevistas se convierten en texto buscable, y luego se pueden resumir o traducir.',p:'M5 4h14v16H5zM8 9h8M8 13h8M8 17h5'},
+    {n:'Atención al cliente',s:'Centros de contacto',d:'Los sistemas de respuesta por voz entienden lo que dice la persona al llamar, la enrutan al área correcta y resuelven consultas simples sin menú de teclas.',p:'M4 13a8 8 0 0 1 16 0M4 13v4a2 2 0 0 0 2 2h1v-6H4M20 13v4a2 2 0 0 1-2 2h-1v-6h3M12 19h4'},
+    {n:'Accesibilidad',s:'Inclusión digital',d:'Personas con limitaciones motrices o visuales controlan el computador y el celular con la voz, y personas sordas leen transcripciones de lo que se dice.',p:'M12 4a2 2 0 1 0 0 .01M6 9h12M12 9v5M9 21l3-7 3 7'}
+  ];
+  var ug=$('#uses'), ud=$('#useDetail');
+  uses.forEach(function(u,i){
+    var b=document.createElement('button'); b.type='button'; b.setAttribute('aria-pressed',i===0?'true':'false');
+    b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="var(--wave)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+u.p+'"/></svg><b>'+u.n+'</b><span class="note">'+u.s+'</span>';
+    b.addEventListener('click',function(){ug.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')}); showUse(i)});
+    ug.appendChild(b);
+  });
+  function showUse(i){var u=uses[i]; ud.innerHTML='<h3>'+u.n+'</h3><p>'+u.d+'</p>'}
+  showUse(0);
+
+  /* ---------- quiz ---------- */
+  var quiz=[
+    {q:'¿Qué frecuencia de muestreo se necesita para capturar voz hasta 8 kHz?',o:['8 kHz','16 kHz','4 kHz'],a:1,e:'Por Nyquist-Shannon, fs debe ser al menos el doble de la frecuencia máxima: 2 × 8 kHz = 16 kHz.'},
+    {q:'¿Qué componente convierte la presión del aire en voltaje?',o:['El micrófono','El altavoz','El decodificador'],a:0,e:'El micrófono es el transductor de entrada. El altavoz hace el camino inverso.'},
+    {q:'¿Qué representación recibe típicamente el modelo Whisper?',o:['Una foto RGB','Un espectrograma log-Mel','Texto sin procesar'],a:1,e:'El audio se convierte en un espectrograma log-Mel antes de entrar a la red neuronal.'}
+  ];
+  var qz=$('#quiz');
+  quiz.forEach(function(it,qi){
+    var d=document.createElement('div'); d.className='q';
+    d.innerHTML='<p><b>'+(qi+1)+'. '+it.q+'</b></p><div class="opts"></div><p class="note" aria-live="polite"></p>';
+    var box=d.querySelector('.opts'), msg=d.querySelector('.note');
+    it.o.forEach(function(t,oi){
+      var b=document.createElement('button'); b.type='button'; b.textContent=t;
+      b.addEventListener('click',function(){
+        box.querySelectorAll('button').forEach(function(x){x.classList.remove('ok','bad')});
+        if(oi===it.a){b.classList.add('ok'); msg.textContent='Correcto. '+it.e}
+        else{b.classList.add('bad'); msg.textContent='Casi. Intenta otra opción.'}
+      });
+      box.appendChild(b);
+    });
+    qz.appendChild(d);
+  });
+
+  /* ---------- redibujar ---------- */
+  function redraw(){drawPart();drawWave();drawSamp();drawSpec();drawNoise()}
+  var raf=0; window.addEventListener('resize',function(){cancelAnimationFrame(raf);raf=requestAnimationFrame(redraw)});
+  try{ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',redraw) }catch(e){}
+  new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+  if(document.fonts&&document.fonts.ready) document.fonts.ready.then(redraw);
+  redraw();
+})();
+</script>
